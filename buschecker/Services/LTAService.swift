@@ -67,7 +67,7 @@ actor LTAService {
         }
         
         var request = URLRequest(url: url)
-        request.setValue(ltaApiKey, forHTTPHeaderField: "AccountKey")
+        request.setValue(Config.ltaApiKey, forHTTPHeaderField: "AccountKey")
         request.setValue("application/json", forHTTPHeaderField: "accept")
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -96,7 +96,7 @@ actor LTAService {
         }
         
         var request = URLRequest(url: url)
-        request.setValue(ltaApiKey, forHTTPHeaderField: "AccountKey")
+        request.setValue(Config.ltaApiKey, forHTTPHeaderField: "AccountKey")
         request.setValue("application/json", forHTTPHeaderField: "accept")
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -141,12 +141,12 @@ actor LTAService {
 
 // MARK: - Nonisolated Decoders (Swift 6 compatibility)
 
-private func decodeBusStopsResponse(from data: Data) throws -> [BusStop] {
+private nonisolated func decodeBusStopsResponse(from data: Data) throws -> [BusStop] {
     let decoded = try JSONDecoder().decode(BusStopsResponse.self, from: data)
     return decoded.value
 }
 
-private func decodeBusArrivalResponse(from data: Data) throws -> [BusService] {
+private nonisolated func decodeBusArrivalResponse(from data: Data) throws -> [BusService] {
     let decoded = try JSONDecoder().decode(BusArrivalResponse.self, from: data)
     return decoded.Services
 }

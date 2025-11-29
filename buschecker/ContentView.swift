@@ -10,8 +10,11 @@ struct ContentView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var arrivalsManager = ArrivalsManager()
     @StateObject private var pinnedManager = PinnedStopsManager()
+    @ObservedObject private var settings = SettingsManager.shared
+    
     @State private var mapPosition: MapCameraPosition = .automatic
-    @State private var showingSettings = false
+    @State private var showingLocationSettings = false
+    @State private var showingAppSettings = false
     @State private var selectedStop: BusStop?
     @State private var showingSheet = false
     @State private var selectedStopID: String?
@@ -94,7 +97,10 @@ struct ContentView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .alert("Location Access Required", isPresented: $showingSettings) {
+        .sheet(isPresented: $showingAppSettings) {
+            SettingsView(settings: settings)
+        }
+        .alert("Location Access Required", isPresented: $showingLocationSettings) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
@@ -189,6 +195,17 @@ struct ContentView: View {
             }
             
             Spacer()
+            
+            // Settings button
+            Button {
+                showingAppSettings = true
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 36, height: 36)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .buttonStyle(.plain)
         }
     }
     
@@ -238,7 +255,7 @@ struct ContentView: View {
         .background(.ultraThinMaterial, in: Capsule())
         .onTapGesture {
             if error is LocationError {
-                showingSettings = true
+                showingLocationSettings = true
             }
         }
     }

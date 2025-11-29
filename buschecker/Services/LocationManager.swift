@@ -11,6 +11,7 @@ import Combine
 @MainActor
 class LocationManager: NSObject, ObservableObject {
     private let locationManager = CLLocationManager()
+    private let settings = SettingsManager.shared
     
     @Published var userLocation: CLLocation?
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
@@ -24,13 +25,10 @@ class LocationManager: NSObject, ObservableObject {
     @Published var visibleStops: [BusStop] = []
     
     // Search radius in meters (for nearby)
-    var searchRadius: CLLocationDistance = 500
+    @Published var searchRadius: CLLocationDistance = 500
     
     // Current visible map region
     var visibleRegion: MKCoordinateRegion?
-    
-    // Max stops to show
-    private let maxVisibleStops = 20
     
     override init() {
         super.init()
@@ -38,6 +36,7 @@ class LocationManager: NSObject, ObservableObject {
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 50 // Update when moved 50m
         authorizationStatus = locationManager.authorizationStatus
+        searchRadius = CLLocationDistance(settings.defaultSearchRadius)
     }
     
     func requestPermission() {
@@ -114,8 +113,12 @@ class LocationManager: NSObject, ObservableObject {
                 $0.location.distance(from: regionCenter) < $1.location.distance(from: regionCenter)
             }
             
+            // Dynamic limit based on zoom level using settings
+            let zoomFactor = min(region.span.latitudeDelta, region.span.longitudeDelta)
+            let dynamicLimit = settings.maxStops(forZoomSpan: zoomFactor)
+            
             for stop in sortedInRegion {
-                if !addedIds.contains(stop.id) && combinedStops.count < maxVisibleStops {
+                if !addedIds.contains(stop.id) && combinedStops.count < dynamicLimit {
                     combinedStops.append(stop)
                     addedIds.insert(stop.id)
                 }
