@@ -1,0 +1,25 @@
+# Secrets
+buschecker/Config.swift
+test_lta_api.sh
+
+# Xcode
+*.xcuserdata
+*.xcscmblueprint
+*.xccheckout
+DerivedData/
+build/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# CocoaPods
+Pods/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
