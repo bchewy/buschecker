@@ -2,9 +2,12 @@
 //  Config.swift
 //  buschecker
 //
+//  Copy this file to buschecker/Config.swift and add your LTA API key.
+//  Get your key at: https://datamall.lta.gov.sg/content/datamall/en/request-for-api.html
+//
 
 import Foundation
 
-// Copy this file to Config.swift and add your LTA DataMall API key
-// Get one at: https://datamall.lta.gov.sg/content/datamall/en/request-for-api.html
-let ltaApiKey = "YOUR_LTA_API_KEY_HERE"
+enum Config {
+    static let ltaApiKey = "YOUR_LTA_API_KEY_HERE"
+}
