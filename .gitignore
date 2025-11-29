@@ -3,7 +3,8 @@ buschecker/Config.swift
 test_lta_api.sh
 
 # Xcode
-*.xcuserdata
+xcuserdata/
+*.xcuserdata/
 *.xcscmblueprint
 *.xccheckout
 DerivedData/
