@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var showingSheet = false
     @State private var selectedStopID: String?
     @State private var showingPinnedList = false
+    @State private var showingStopsList = false
     
     // Singapore center
     private let singaporeCenter = CLLocationCoordinate2D(latitude: 1.3521, longitude: 103.8198)
@@ -42,7 +43,7 @@ struct ContentView: View {
                 Spacer()
                 
                 // Bus stop cards at bottom (only nearby stops)
-                if !locationManager.nearbyStops.isEmpty {
+                if settings.showBusStopCarousel && !locationManager.nearbyStops.isEmpty {
                     stopsCarousel
                 }
                 
@@ -100,6 +101,21 @@ struct ContentView: View {
         .sheet(isPresented: $showingAppSettings) {
             SettingsView(settings: settings)
         }
+        .sheet(isPresented: $showingStopsList) {
+            StopsListView(
+                nearbyStops: locationManager.nearbyStops,
+                allStops: locationManager.allBusStops,
+                userLocation: locationManager.userLocation,
+                onSelectStop: { stop in
+                    showingStopsList = false
+                    selectedStop = stop
+                    showingSheet = true
+                    centerOnStop(stop)
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .alert("Location Access Required", isPresented: $showingLocationSettings) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -122,7 +138,7 @@ struct ContentView: View {
             // Pinned stops (orange markers)
             ForEach(pinnedStops) { stop in
                 Annotation(stop.Description, coordinate: stop.coordinate, anchor: .center) {
-                    PinnedStopMarker()
+                    PinnedStopMarker(color: settings.pinnedStopColor)
                 }
                 .tag(stop.id)
             }
@@ -190,22 +206,9 @@ struct ContentView: View {
                 loadingPill
             } else if let error = locationManager.error {
                 errorPill(error)
-            } else if !locationManager.visibleStops.isEmpty {
-                statusPill
             }
             
             Spacer()
-            
-            // Settings button
-            Button {
-                showingAppSettings = true
-            } label: {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 36, height: 36)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .buttonStyle(.plain)
         }
     }
     
@@ -221,24 +224,54 @@ struct ContentView: View {
         .background(.ultraThinMaterial, in: Capsule())
     }
     
+    @ObservedObject private var refreshTimer = RefreshTimerManager.shared
+    
     private var statusPill: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "bus.fill")
-                .font(.system(size: 10))
-            Text("\(locationManager.visibleStops.count) stops")
-                .font(.system(size: 12, weight: .medium))
-            
-            if !locationManager.nearbyStops.isEmpty {
-                Text("•")
-                    .foregroundStyle(.tertiary)
-                Text("\(locationManager.nearbyStops.count) nearby")
-                    .font(.system(size: 12, weight: .medium))
+        Button {
+            showingStopsList = true
+        } label: {
+            HStack(spacing: 6) {
+                if refreshTimer.justUpdated {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.green)
+                    
+                    Text("Updated!")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.green)
+                } else {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11, weight: .medium))
+                    
+                    Text("Search")
+                        .font(.system(size: 12, weight: .medium))
+                    
+                    Text("•")
+                        .foregroundStyle(.tertiary)
+                    
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 9, weight: .medium))
+                        Text("\(refreshTimer.countdown)s")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    }
                     .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(refreshTimer.justUpdated ? Color.green.opacity(0.15) : Color.clear)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .animation(.easeInOut(duration: 0.3), value: refreshTimer.justUpdated)
+        }
+        .buttonStyle(.plain)
+        .overlay {
+            if refreshTimer.justUpdated {
+                ConfettiView()
+                    .allowsHitTesting(false)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: Capsule())
     }
     
     private func errorPill(_ error: Error) -> some View {
@@ -264,27 +297,49 @@ struct ContentView: View {
     
     private var bottomControls: some View {
         HStack(alignment: .bottom) {
-            // Pinned stops button (bottom left)
-            Button {
-                showingPinnedList = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "pin.fill")
+            // Left controls
+            VStack(alignment: .leading, spacing: 8) {
+                // Settings button
+                Button {
+                    showingAppSettings = true
+                } label: {
+                    Image(systemName: "gearshape.fill")
                         .font(.system(size: 14, weight: .medium))
-                    
-                    if !pinnedStops.isEmpty {
-                        Text("\(pinnedStops.count)")
-                            .font(.system(size: 12, weight: .bold))
-                    }
+                        .frame(width: 40, height: 40)
+                        .background(.ultraThinMaterial, in: Circle())
                 }
-                .foregroundColor(pinnedStops.isEmpty ? .secondary : .orange)
-                .frame(height: 44)
-                .padding(.horizontal, 14)
-                .background(.ultraThinMaterial, in: Capsule())
+                .buttonStyle(.plain)
+                
+                // Pinned stops button
+                Button {
+                    showingPinnedList = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 14, weight: .medium))
+                        
+                        if !pinnedStops.isEmpty {
+                            Text("\(pinnedStops.count)")
+                                .font(.system(size: 12, weight: .bold))
+                        }
+                    }
+                    .foregroundColor(pinnedStops.isEmpty ? .secondary : settings.pinnedStopColor)
+                    .frame(height: 40)
+                    .padding(.horizontal, 14)
+                    .background(.ultraThinMaterial, in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .padding(.leading, 12)
             .padding(.bottom, 8)
+            
+            Spacer()
+            
+            // Center status pill
+            if !locationManager.visibleStops.isEmpty {
+                statusPill
+                    .padding(.bottom, 8)
+            }
             
             Spacer()
             
@@ -377,15 +432,17 @@ struct BusStopMarker: View {
     }
 }
 
-// MARK: - Pinned Stop Marker (Orange)
+// MARK: - Pinned Stop Marker
 
 struct PinnedStopMarker: View {
+    var color: Color = .orange
+    
     var body: some View {
         ZStack {
             Circle()
-                .fill(Color.orange)
+                .fill(color)
                 .frame(width: 36, height: 36)
-                .shadow(color: Color.orange.opacity(0.4), radius: 4, y: 2)
+                .shadow(color: color.opacity(0.4), radius: 4, y: 2)
             
             Image(systemName: "bus.fill")
                 .font(.system(size: 16, weight: .semibold))
@@ -414,7 +471,7 @@ struct PinnedStopsListView: View {
                             } label: {
                                 HStack(spacing: 12) {
                                     Image(systemName: "pin.fill")
-                                        .foregroundStyle(.orange)
+                                        .foregroundStyle(SettingsManager.shared.pinnedStopColor)
                                         .font(.system(size: 14))
                                     
                                     VStack(alignment: .leading, spacing: 2) {
@@ -469,6 +526,63 @@ struct PinnedStopsListView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+}
+
+// MARK: - Confetti View
+
+struct ConfettiView: View {
+    @State private var particles: [ConfettiParticle] = []
+    
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                ForEach(particles) { particle in
+                    Text(particle.emoji)
+                        .font(.system(size: particle.size))
+                        .position(particle.position)
+                        .opacity(particle.opacity)
+                }
+            }
+            .onAppear {
+                createParticles(in: geo.size)
+            }
+        }
+    }
+    
+    private func createParticles(in size: CGSize) {
+        let emojis = ["🎉", "✨", "🚌", "⭐️", "🎊"]
+        
+        for i in 0..<12 {
+            let particle = ConfettiParticle(
+                emoji: emojis.randomElement()!,
+                size: CGFloat.random(in: 12...20),
+                position: CGPoint(
+                    x: CGFloat.random(in: -50...size.width + 50),
+                    y: CGFloat.random(in: -30...0)
+                ),
+                opacity: 1.0
+            )
+            particles.append(particle)
+            
+            // Animate each particle
+            let delay = Double(i) * 0.05
+            withAnimation(.easeOut(duration: 1.5).delay(delay)) {
+                if let index = particles.firstIndex(where: { $0.id == particle.id }) {
+                    particles[index].position.y += CGFloat.random(in: 80...150)
+                    particles[index].position.x += CGFloat.random(in: -30...30)
+                    particles[index].opacity = 0
+                }
+            }
+        }
+    }
+}
+
+struct ConfettiParticle: Identifiable {
+    let id = UUID()
+    let emoji: String
+    let size: CGFloat
+    var position: CGPoint
+    var opacity: Double
 }
 
 #Preview {

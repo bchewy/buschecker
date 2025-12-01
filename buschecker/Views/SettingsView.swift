@@ -73,13 +73,43 @@ struct SettingsView: View {
                 
                 // Display Settings
                 Section {
+                    Toggle("Bus Stop Carousel", isOn: $settings.showBusStopCarousel)
                     Toggle("Wheelchair Accessible", isOn: $settings.showWheelchairAccessible)
                     Toggle("Bus Type (SD/DD)", isOn: $settings.showBusType)
                     Toggle("Load Indicator", isOn: $settings.showLoadIndicator)
                 } header: {
                     Text("Display Options")
                 } footer: {
-                    Text("Show or hide additional bus information.")
+                    Text("Carousel shows nearby bus stops with arrival times at the bottom of the map.")
+                }
+                
+                // Pinned Stops Color
+                Section {
+                    HStack {
+                        Text("Pinned Stop Color")
+                        Spacer()
+                        HStack(spacing: 8) {
+                            ForEach(Array(SettingsManager.colorOptions.keys.sorted()), id: \.self) { colorName in
+                                Button {
+                                    settings.pinnedStopColorName = colorName
+                                } label: {
+                                    Circle()
+                                        .fill(SettingsManager.colorOptions[colorName] ?? .orange)
+                                        .frame(width: 28, height: 28)
+                                        .overlay {
+                                            if settings.pinnedStopColorName == colorName {
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 12, weight: .bold))
+                                                    .foregroundColor(.white)
+                                            }
+                                        }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Pinned Stops")
                 }
                 
                 // Reset

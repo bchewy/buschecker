@@ -21,6 +21,24 @@ class SettingsManager: ObservableObject {
     @AppStorage("showWheelchairAccessible") var showWheelchairAccessible: Bool = true
     @AppStorage("showBusType") var showBusType: Bool = true
     @AppStorage("showLoadIndicator") var showLoadIndicator: Bool = true
+    @AppStorage("showBusStopCarousel") var showBusStopCarousel: Bool = false
+    @AppStorage("pinnedStopColorName") var pinnedStopColorName: String = "orange"
+    
+    // Computed property for the actual Color
+    var pinnedStopColor: Color {
+        Self.colorOptions[pinnedStopColorName] ?? .orange
+    }
+    
+    static let colorOptions: [String: Color] = [
+        "orange": .orange,
+        "red": .red,
+        "pink": .pink,
+        "purple": .purple,
+        "blue": .blue,
+        "teal": .teal,
+        "green": .green,
+        "yellow": .yellow
+    ]
     
     private init() {}
     
@@ -45,6 +63,8 @@ class SettingsManager: ObservableObject {
         showWheelchairAccessible = true
         showBusType = true
         showLoadIndicator = true
+        showBusStopCarousel = false
+        pinnedStopColorName = "orange"
     }
 }
 

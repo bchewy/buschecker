@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct BusStopSheet: View {
     let busStop: BusStop
@@ -14,9 +15,8 @@ struct BusStopSheet: View {
     @State private var error: Error?
     @State private var lastUpdated: Date?
     
-    // Auto-refresh timer
-    private let refreshInterval: TimeInterval = 20
-    @State private var refreshTimer: Timer?
+    // Shared refresh timer
+    @ObservedObject private var refreshTimer = RefreshTimerManager.shared
     
     private var isPinned: Bool {
         pinnedManager.isPinned(busStop.BusStopCode)
@@ -42,10 +42,9 @@ struct BusStopSheet: View {
         }
         .task {
             await fetchArrivals()
-            startAutoRefresh()
         }
-        .onDisappear {
-            stopAutoRefresh()
+        .onReceive(NotificationCenter.default.publisher(for: .refreshTriggered)) { _ in
+            Task { await fetchArrivals() }
         }
     }
     
@@ -60,6 +59,38 @@ struct BusStopSheet: View {
                 
                 Spacer()
                 
+                // Apple Maps button
+                Button {
+                    openAppleMaps()
+                } label: {
+                    Image(systemName: "apple.logo")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .frame(width: 32, height: 32)
+                        .background(Color(.systemGray6))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                
+                // Google Maps button
+                Button {
+                    openGoogleMaps()
+                } label: {
+                    Text("G")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .red, .yellow, .green],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 32, height: 32)
+                        .background(Color(.systemGray6))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                
                 // Pin button
                 Button {
                     withAnimation(.spring(response: 0.3)) {
@@ -68,9 +99,9 @@ struct BusStopSheet: View {
                 } label: {
                     Image(systemName: isPinned ? "pin.fill" : "pin")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(isPinned ? .orange : .secondary)
+                        .foregroundStyle(isPinned ? SettingsManager.shared.pinnedStopColor : .secondary)
                         .frame(width: 32, height: 32)
-                        .background(isPinned ? Color.orange.opacity(0.15) : Color(.systemGray6))
+                        .background(isPinned ? SettingsManager.shared.pinnedStopColor.opacity(0.15) : Color(.systemGray6))
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -100,13 +131,35 @@ struct BusStopSheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             }
             
-            if let lastUpdated = lastUpdated {
-                Text("Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            // Countdown / Updated indicator
+            if refreshTimer.justUpdated {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10))
+                    Text("Updated!")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                }
+                .foregroundStyle(.green)
+                .transition(.scale.combined(with: .opacity))
+            } else {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 9))
+                    Text("\(refreshTimer.countdown)s")
+                        .font(.system(size: 11, design: .monospaced))
+                }
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
             }
         }
         .padding()
+        .overlay(alignment: .top) {
+            if refreshTimer.justUpdated {
+                SheetConfettiView()
+                    .allowsHitTesting(false)
+            }
+        }
     }
     
     // MARK: - Services List
@@ -197,17 +250,24 @@ struct BusStopSheet: View {
         isLoading = false
     }
     
-    // MARK: - Auto Refresh
+    // MARK: - Maps Navigation
     
-    private func startAutoRefresh() {
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { _ in
-            Task { await fetchArrivals() }
+    private func openAppleMaps() {
+        let name = busStop.Description.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        if let url = URL(string: "maps://?ll=\(busStop.Latitude),\(busStop.Longitude)&q=\(name)") {
+            UIApplication.shared.open(url)
         }
     }
     
-    private func stopAutoRefresh() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
+    private func openGoogleMaps() {
+        let googleMapsURL = URL(string: "comgooglemaps://?center=\(busStop.Latitude),\(busStop.Longitude)&q=\(busStop.Latitude),\(busStop.Longitude)")
+        let webURL = URL(string: "https://www.google.com/maps/search/?api=1&query=\(busStop.Latitude),\(busStop.Longitude)")
+        
+        if let gm = googleMapsURL, UIApplication.shared.canOpenURL(gm) {
+            UIApplication.shared.open(gm)
+        } else if let web = webURL {
+            UIApplication.shared.open(web)
+        }
     }
 }
 
@@ -285,4 +345,61 @@ struct ArrivalBadge: View {
         }
         .frame(minWidth: isPrimary ? 50 : 40)
     }
+}
+
+// MARK: - Sheet Confetti View
+
+struct SheetConfettiView: View {
+    @State private var particles: [SheetConfettiParticle] = []
+    
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                ForEach(particles) { particle in
+                    Text(particle.emoji)
+                        .font(.system(size: particle.size))
+                        .position(particle.position)
+                        .opacity(particle.opacity)
+                }
+            }
+            .onAppear {
+                createParticles(in: geo.size)
+            }
+        }
+        .frame(height: 100)
+    }
+    
+    private func createParticles(in size: CGSize) {
+        let emojis = ["🎉", "✨", "🚌", "⭐️", "🎊", "💫"]
+        
+        for i in 0..<15 {
+            let particle = SheetConfettiParticle(
+                emoji: emojis.randomElement()!,
+                size: CGFloat.random(in: 14...22),
+                position: CGPoint(
+                    x: CGFloat.random(in: 20...size.width - 20),
+                    y: CGFloat.random(in: -20...10)
+                ),
+                opacity: 1.0
+            )
+            particles.append(particle)
+            
+            let delay = Double(i) * 0.03
+            withAnimation(.easeOut(duration: 1.2).delay(delay)) {
+                if let index = particles.firstIndex(where: { $0.id == particle.id }) {
+                    particles[index].position.y += CGFloat.random(in: 60...120)
+                    particles[index].position.x += CGFloat.random(in: -20...20)
+                    particles[index].opacity = 0
+                }
+            }
+        }
+    }
+}
+
+struct SheetConfettiParticle: Identifiable {
+    let id = UUID()
+    let emoji: String
+    let size: CGFloat
+    var position: CGPoint
+    var opacity: Double
 }
