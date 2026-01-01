@@ -309,6 +309,7 @@ struct ContentView: View {
                         .background(.ultraThinMaterial, in: Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Settings")
                 
                 // Pinned stops button
                 Button {
@@ -317,7 +318,7 @@ struct ContentView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "pin.fill")
                             .font(.system(size: 14, weight: .medium))
-                        
+
                         if !pinnedStops.isEmpty {
                             Text("\(pinnedStops.count)")
                                 .font(.system(size: 12, weight: .bold))
@@ -329,6 +330,7 @@ struct ContentView: View {
                     .background(.ultraThinMaterial, in: Capsule())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Pinned stops, \(pinnedStops.count) saved")
             }
             .padding(.leading, 12)
             .padding(.bottom, 8)
@@ -354,6 +356,7 @@ struct ContentView: View {
                         .background(.ultraThinMaterial, in: Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Center on my location")
                 
                 // Radius control (for nearby filtering)
                 Menu {
@@ -376,6 +379,7 @@ struct ContentView: View {
                         .background(.ultraThinMaterial, in: Capsule())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Search radius \(Int(locationManager.searchRadius)) meters")
             }
             .padding(.trailing, 12)
             .padding(.bottom, 8)
@@ -424,11 +428,12 @@ struct BusStopMarker: View {
                 .fill(.white)
                 .frame(width: 32, height: 32)
                 .shadow(color: .black.opacity(0.15), radius: 3, y: 2)
-            
+
             Image(systemName: "bus.fill")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.blue)
         }
+        .accessibilityLabel("Bus stop")
     }
 }
 
@@ -436,18 +441,19 @@ struct BusStopMarker: View {
 
 struct PinnedStopMarker: View {
     var color: Color = .orange
-    
+
     var body: some View {
         ZStack {
             Circle()
                 .fill(color)
                 .frame(width: 36, height: 36)
                 .shadow(color: color.opacity(0.4), radius: 4, y: 2)
-            
+
             Image(systemName: "bus.fill")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.white)
         }
+        .accessibilityLabel("Pinned bus stop")
     }
 }
 
